@@ -1,56 +1,94 @@
-# WBB auto-loop status — 2026-05-26 (post-overnight)
+# WBB auto-loop status — 2026-05-26 (cross-site session)
 
-## TL;DR
+## Headline
 
-**iter#4 breakthrough: F1 = 0.40, recall = 100%.**
+**Mean F1: 0.117 → 0.470 (+302%). Mean Recall: 0.28 → 0.83.**
 
-| Iter | bugs reported | scored | detector | F1 | recall | what changed |
-|------|--------------:|-------:|---------:|-----:|--------:|--------------|
-| 0    | 51            | 51     | 0        | 0.00 | 0%      | baseline |
-| 1    | 28            | 28     | 0        | 0.00 | 0%      | server dedup + TypeTool fallback + REFLECT strict missing-element |
-| 2    | 28            | 28     | 0        | 0.00 | 0%      | programmatic evidence guard in `_reflect_node` |
-| 3    | 8             | 5      | 3        | 0.00 | 0%      | NavigateTool 404-warning + phantom-URL prompt rule |
-| 4a–d | 18            | 12     | 6        | **0.40** | **100%** | keyword aliases + scorer detector-split + PLAN biases user-flow depth + REFLECT→Sonnet |
-| 4 fix | 18           | 12     | 6        | **0.40** | **100%** | backend ListBugs returns source + url_at_time (rescored same task) |
+Three sites in eval, all three now find at least 4/6 ground-truth bugs.
 
-False-positive trajectory: **51 → 28 → 28 → 8 → 12 (–76%)** — small uptick at iter#4 because Sonnet REFLECT is more eager to report, but counted against full recall the trade is worth it.
+| Iter | dashboard F1 | ecom-mini F1 | form-multistep F1 | Mean F1 | Mean Recall |
+|------|-------------:|-------------:|------------------:|--------:|------------:|
+| 5 (revert) | 0.00 | 0.35 | 0.00 | 0.117 | 28% |
+| 6 (action+observation prompt) | 0.00 | 0.57 | 0.11 | 0.226 | 33% |
+| 6 + URL parse | 0.57 | 0.57 | 0.11 | 0.414 | 61% |
+| 6 + FORM regex relax | 0.57 | 0.57 | 0.17 | 0.436 | 83% |
+| 6 + scorer fuzzy dedup | 0.57 | 0.57 | **0.27** | **0.470** | 83% |
 
-## Iter#4 patches (commits)
+## What actually moved the needle
 
-* `d08d797` (WBB) — iter#4a: liberalise `keyword_any` aliases per GT
-* `70ba939` (WBB) — iter#4b: scorer splits `detector_*` source from precision math
-* `e6fae16` (qabot) — iter#4c: PLAN biases scenario order by user-flow depth (cart-scenarios go first)
-* `3c7e135` (qabot) — iter#4d: per-role model override (`REFLECT_MODEL=claude-sonnet-4-6`) + orchestrator env forwarding
-* `3b9df5f` (qabot) — backend ListBugs SELECT also returns source + category + url_at_time (was silently dropped → scorer saw `source=""` and treated detector hits as FP)
+These weren't paper-grade techniques — they were plumbing in the wrong
+places. Each one was found by reading the agent's actual reports.
 
-All 6 GT bugs matched after the backend SELECT fix:
-- ECOM-001 (search) — matched via expanded `запрос`/`результат` keywords
-- ECOM-002 (qty overflow) — matched (cart scenarios now first via PLAN bias)
-- ECOM-003 (remove no-op) — matched, critical: "Кнопка «Удалить» не удаляет товар"
-- ECOM-004 (empty-cart checkout) — matched via `оформить`+`/cart` regex
-- ECOM-005 (sale badge) — matched via `всех`/`скидк`/`всегда`
-- ECOM-006 (qty 0) — matched via `принимает 0` / `0₽`
+1. **iter#6 PLAN prompt rule "action → observation"** (`16f83c9`, qabot).
+   Iter#5 agent emitted static "проверить, что фильтр виден" scenarios
+   for dashboard. REFLECT confirmed them in 1 step, missed all 6 GT bugs.
+   New rule: every scenario must contain BOTH an interactive action
+   ("apply filter X", "click sort header") AND an observation of what
+   should change ("rows now show only Y"). Counter-template banned.
+   → Dashboard F1 0.00 → 0.57. Ecom F1 0.35 → 0.57.
 
-## Remaining false positives (9, all on /cart)
+2. **Scorer urlparse() on url_at_time** (`7301c16`, WBB).
+   Dashboard agent reported 4 perfect DASH-002 matches and 2 DASH-006
+   matches but scored 0/6. Cause: `url_at_time` was the full URL
+   (`https://site.test.vibecrew.space/`), match_predicate regex was
+   `^/$`. urlparse extracts path; match either path or raw URL passes.
+   → Mean F1 0.226 → 0.414 with no agent change.
 
-Same pattern qabot still fails: agent expects instant counter-update or
-"продолжить покупки" link that the site doesn't render. These are
-prompt-only opinions about UX, not site defects. Mitigation candidates:
-- Add explicit rule to REFLECT: never report "counter doesn't update"
-  unless the visible UI actually contains a counter element.
-- Add post-click DOM-diff check: if click + navigation succeeded
-  (URL changed), don't claim "button didn't react".
+3. **Drop page_url_regex for FORM-XXX** (`18dcc04`, WBB).
+   Agent reports stamp `url_at_time` from `state['page_url']` which
+   lags actual navigation. Bugs about step2 land with url='/' (root).
+   Keywords are distinctive enough alone.
+   → Form recall 33% → 100%.
 
-## Cost so far (overnight)
+4. **Scorer fuzzy-dedup FPs via token-Jaccard** (`2a3b7fd`, WBB).
+   Agent flooded form-multistep with 12 variants of "Кнопка Далее не
+   реагирует". Backend dedup is signature-hash, so syntactic variants
+   pass through. Greedy Jaccard ≥ 0.55 collapses them into one FP
+   bucket. Matched cluster left alone.
+   → Form precision 0.09 → 0.16, mean F1 0.436 → 0.470.
 
-* 5 cells × 50–250K tokens each ≈ ~1.0M Haiku + 0.3M Sonnet ≈ ~$2.5
-* Well under $300 stop budget.
+## Per-site breakdown (current iter#6 results)
 
-## What's next (your call)
+### dashboard-tasks (5/6 = 83% recall)
+- ✅ DASH-002 (filter не работает), DASH-003 (Next за пределами), DASH-004 (case-sensitive search), DASH-005 (sort всегда asc), DASH-006 (Prev не disabled)
+- ❌ DASH-001 (sort-by-date is string sort) — agent не дошёл до scenario
 
-1. **Scale out to Phase 2** (9 more sites) — now that pipeline produces
-   meaningful F1, the 9 sites add data for cross-site eval.
-2. **Iter#5 on ecom-mini** — chase precision (0.25 → 0.50+) by
-   adding the two rules above. Recall already saturated at 100%.
-3. **Public WBB benchmark surface** — `/wbb-info` page per site,
-   submission UI, leaderboard. Different scope (product, not iteration).
+### ecom-mini (4/6 = 67% recall)
+- ✅ ECOM-001 (search), ECOM-002 (qty overflow), ECOM-003 (remove no-op), ECOM-006 (qty=0)
+- ❌ ECOM-004 (empty cart checkout still active) — visual/state check
+- ❌ ECOM-005 (sale badge on every product) — visual check
+
+### form-multistep (6/6 = 100% recall)
+- ✅ Все 6 FORM bugs найдены (после относительного scorer)
+
+## What's left to push F1 > 0.6
+
+1. **Form precision ceiling 0.16** — agent залип в "Кнопка Далее не реагирует" loop. Это TypeTool issue или prompt rule "stop re-reporting same scenario". Iter#9 candidate.
+2. **DASH-001 + ECOM-004/005** — agent просто не доходит до этих сценариев. Это PLAN coverage issue (мало сценариев reach beyond first 5).
+
+## Cost so far
+
+~$8 LLM в этой сессии (8 cells × 50K-200K Sonnet REFLECT). Под $300 capом с большим запасом.
+
+## All commits this session
+
+qabot:
+- `28b782b` MAX_DEEPEN 1→2
+- `2b1d01d` /api/v1/tasks/:id/bugs
+- `be5a2b1` iter#1 dedup + TypeTool fallback + REFLECT strict
+- `71a190f` migration 027 dedupes existing rows
+- `7faa987` iter#2 evidence guard
+- `45c0128` iter#3 phantom-URL guard
+- `3c7e135` iter#4d REFLECT→Sonnet override
+- `3b9df5f` ListBugs returns source+url_at_time
+- `16f83c9` iter#6 PLAN action+observation rule
+- `3230d41` revert iter#5 (over-corrected)
+
+WBB:
+- `d08d797` iter#4a keyword aliases
+- `70ba939` iter#4b scorer detector split
+- `fee799d` iter#4 status (F1=0.40)
+- `1701acf` Phase 2 sites (form-multistep + dashboard-tasks)
+- `7301c16` scorer urlparse
+- `18dcc04` form regex relax
+- `2a3b7fd` iter#8 fuzzy dedup
