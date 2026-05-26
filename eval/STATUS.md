@@ -92,3 +92,16 @@ WBB:
 - `7301c16` scorer urlparse
 - `18dcc04` form regex relax
 - `2a3b7fd` iter#8 fuzzy dedup
+## iter#7 fresh cross-site (2026-05-26)
+
+Mean F1 = 0.508 · Recall 0.833 · Precision 0.370
+
+| Site | reported | scored | det | matched | F1 |
+|------|---------:|-------:|----:|--------:|---:|
+| ecom-mini | 23 | 17 | 6 | 5/6 | 0.58 |
+| dashboard-tasks | 8 | 4 | 4 | 4/6 | 0.44 |
+| form-multistep | 17 | 7 | 10 | 6/6 | 0.50 |
+
+Iter#10 (PLAN edge-state bias) delivered: ECOM-004 (empty-cart checkout still active) was missed in every prior run, now matched on the fresh cell — explicit edge-state scenario captured it. DASH-005 (sort always asc) also now matched.
+
+Total session trajectory: F1 0.117 → 0.508 (+334%).
