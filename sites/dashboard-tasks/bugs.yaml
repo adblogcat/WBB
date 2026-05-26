@@ -1,0 +1,156 @@
+# Ground truth for dashboard-tasks.test.vibecrew.space
+# Each entry is an intentionally planted defect. The evaluator scores
+# agent runs by matching reported bugs to these entries via match_predicate.
+
+- id: DASH-001
+  category: data
+  severity: high
+  trigger: "Кликните на заголовок колонки 'Сортировать по дате' и посмотрите порядок строк."
+  expected: "Строки отсортированы по реальной хронологии (по полю created как по дате)."
+  actual: "Сортировка лексикографическая по строке: '2025-01-10' идёт раньше '2025-1-5' и т.п. — порядок не совпадает с хронологическим."
+  match_predicate:
+    keywords_any:
+      - "сортировк"
+      - "сортирован"
+      - "sort"
+      - "дата"
+      - "date"
+      - "created"
+      - "строк"          # сортирует как строки
+      - "string"
+      - "лексикограф"
+      - "localeCompare"
+      - "не парс"        # не парсит дату
+      - "Date"
+      - "порядок"
+      - "хронолог"
+      - "padding"
+    page_url_regex: "^/$"
+
+- id: DASH-002
+  category: function
+  severity: critical
+  trigger: "В фильтре 'Статус' выберите 'Active' и посмотрите таблицу."
+  expected: "Должны остаться только строки со статусом Active."
+  actual: "Таблица продолжает показывать также Done и Blocked — фильтр по статусу не работает."
+  match_predicate:
+    keywords_any:
+      - "фильтр"
+      - "filter"
+      - "статус"
+      - "status"
+      - "Active"
+      - "Done"
+      - "Blocked"
+      - "не работает"
+      - "не фильтрует"
+      - "показывает все"
+      - "все строк"
+      - "игнор"          # игнорирует фильтр
+      - "выпадающ"       # выпадающий список
+      - "dropdown"
+    page_url_regex: "^/$"
+
+- id: DASH-003
+  category: function
+  severity: high
+  trigger: "Пролистайте таблицу до последней страницы и нажмите 'Next ›'."
+  expected: "На последней странице кнопка 'Next ›' должна быть disabled или ничего не делать."
+  actual: "Счётчик перескакивает в 'Стр. M+1 из M', таблица отрисовывается пустой."
+  match_predicate:
+    keywords_any:
+      - "пагинац"
+      - "pagination"
+      - "next"
+      - "след"            # следующая страница
+      - "последн"
+      - "пуст"            # пустая страница
+      - "empty"
+      - "M+1"
+      - "за пределами"
+      - "out of range"
+      - "guard"
+      - "проверк"         # проверка границы
+      - "граница"
+      - "boundary"
+      - "счётчик"
+    page_url_regex: "^/$"
+
+- id: DASH-004
+  category: function
+  severity: medium
+  trigger: "В поле поиска введите 'apple' (маленькими буквами)."
+  expected: "Должна найтись задача 'Apple migration' (регистронезависимый поиск)."
+  actual: "Поиск ничего не находит, потому что чувствителен к регистру."
+  match_predicate:
+    keywords_any:
+      - "поиск"
+      - "search"
+      - "регистр"
+      - "case"
+      - "case-sensitive"
+      - "case sensitive"
+      - "регистрозавис"
+      - "toLowerCase"
+      - "Apple"
+      - "apple"
+      - "не находит"
+      - "не находится"
+      - "не работает"
+      - "case-insensitive"
+    page_url_regex: "^/$"
+
+- id: DASH-005
+  category: usability
+  severity: medium
+  trigger: "Кликните на заголовок колонки (например, 'Название') один раз, затем второй раз."
+  expected: "Повторный клик по тому же заголовку должен переключать направление сортировки (asc ↔ desc)."
+  actual: "Сортировка всегда asc — повторный клик ничего не переключает."
+  match_predicate:
+    keywords_any:
+      - "сортировк"
+      - "sort"
+      - "направлен"        # направление
+      - "direction"
+      - "toggle"
+      - "переключ"
+      - "asc"
+      - "desc"
+      - "по возрастан"
+      - "по убыван"
+      - "ascending"
+      - "descending"
+      - "повторн"          # повторный клик
+      - "клик"
+      - "header"
+    page_url_regex: "^/$"
+
+- id: DASH-006
+  category: visual
+  severity: low
+  trigger: "Откройте таблицу (страница 1) и посмотрите на кнопку '‹ Prev'; пролистайте на последнюю страницу — посмотрите на 'Next ›'."
+  expected: "Кнопка пагинации, которая не имеет действия (Prev на стр. 1, Next на последней), должна быть disabled/приглушённой."
+  actual: "Кнопки всегда выглядят активными — нет атрибута disabled, нет приглушённого стиля."
+  match_predicate:
+    keywords_any:
+      - "кнопк"
+      - "button"
+      - "disabled"
+      - "приглуш"
+      - "серый"
+      - "greyed"
+      - "grayed"
+      - "состояни"          # состояние кнопки
+      - "пагинац"
+      - "pagination"
+      - "outlined"
+      - "стиль"
+      - "не активн"
+      - "без атрибута"
+      - "opacity"
+    page_url_regex: "^/$"
+
+# Deliberate non-bugs (false-positive bait):
+# - Заголовок 'Сортировать по дате' длиннее остальных — это намеренно, не баг копирайтинга.
+# - Поле поиска не имеет кнопки 'Найти' — фильтрация в реальном времени по onChange.
+# - Цветовая палитра пилюль статусов/приоритетов выбрана намеренно (не «низкий контраст»).

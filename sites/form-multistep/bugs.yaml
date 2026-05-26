@@ -1,0 +1,180 @@
+# Ground truth for form-multistep.test.vibecrew.space
+# Each entry is an intentionally planted defect. The evaluator scores
+# agent runs by matching reported bugs to these entries via match_predicate.
+
+- id: FORM-001
+  category: function
+  severity: high
+  trigger: "На /signup/step1 введите в поле Email значение 'abc@' (без домена) и нажмите 'Далее'."
+  expected: "Форма должна отклонить email без домена, показать ошибку валидации и остаться на шаге 1."
+  actual: "Поле принимает 'abc@' как валидный email, кнопка 'Далее' срабатывает и пользователь переходит на шаг 2."
+  match_predicate:
+    keywords_any:
+      - "email"
+      - "имейл"
+      - "валидац"
+      - "validation"
+      - "regex"
+      - "формат"
+      - "format"
+      - "домен"
+      - "domain"
+      - "abc@"
+      - "type=\"email\""
+      - "type=email"
+      - "неверн"
+      - "некорректн"
+      - "invalid"
+      - "без домена"
+      - "проверк"
+    page_url_regex: "/signup/step1"
+
+- id: FORM-002
+  category: function
+  severity: critical
+  trigger: "Пройдите на /signup/step2, оставьте поле пароля пустым и нажмите 'Далее'."
+  expected: "Кнопка 'Далее' должна быть disabled, пока пароль не введён (или показывать ошибку при клике)."
+  actual: "Кнопка 'Далее' активна с пустым паролем, по клику переход на шаг 3 происходит без всякой проверки."
+  match_predicate:
+    keywords_any:
+      - "пароль"
+      - "password"
+      - "пуст"
+      - "empty"
+      - "disabled"
+      - "активн"
+      - "guard"
+      - "проверк"
+      - "validation"
+      - "валидац"
+      - "обязательн"
+      - "required"
+      - "далее"
+      - "next"
+      - "переход"
+      - "blank"
+      - "без пароля"
+    page_url_regex: "/signup/step2$"
+
+- id: FORM-003
+  category: data
+  severity: high
+  trigger: "На /signup/step1 заполните email и имя, нажмите 'Далее', затем на step2 нажмите 'Назад'."
+  expected: "Поля email и имя на шаге 1 должны быть заполнены ранее введёнными значениями."
+  actual: "Поля email и имя пустые при возврате на шаг 1, хотя данные сохранены в localStorage."
+  match_predicate:
+    keywords_any:
+      - "назад"
+      - "back"
+      - "состояние"
+      - "state"
+      - "потер"
+      - "lost"
+      - "сброс"
+      - "reset"
+      - "пуст"
+      - "empty"
+      - "localStorage"
+      - "сохран"
+      - "persist"
+      - "восстанов"
+      - "rehydrate"
+      - "данные"
+      - "step1"
+      - "шаг 1"
+      - "форма очищ"
+    page_url_regex: "/signup/step(1|2)"
+
+- id: FORM-004
+  category: function
+  severity: critical
+  trigger: "Пройдите регистрацию: на step2 введите пароль 'abc12345' и подтверждение 'xyz99999' (разные), затем на step3 примите соглашение и нажмите Continue."
+  expected: "Должна появиться ошибка 'Пароли не совпадают', регистрация не должна завершиться."
+  actual: "Появляется страница 'Регистрация успешна' несмотря на несовпадение пароля и подтверждения."
+  match_predicate:
+    keywords_any:
+      - "пароль"
+      - "password"
+      - "подтвержд"
+      - "confirm"
+      - "не совпада"
+      - "mismatch"
+      - "разные"
+      - "different"
+      - "сравнени"
+      - "compare"
+      - "регистрац"
+      - "registration"
+      - "успешн"
+      - "success"
+      - "проверк"
+      - "validation"
+      - "submit"
+      - "игнорирует"
+      - "не проверяется"
+    page_url_regex: "/signup/step3$"
+
+- id: FORM-005
+  category: usability
+  severity: medium
+  trigger: "На /signup/step1 оставьте поле email пустым, нажмите 'Далее'."
+  expected: "Должна появиться видимая ошибка (toast, красная рамка, сообщение под полем) о том, что email обязателен."
+  actual: "Ничего не происходит — никакой реакции на клик нет, нет ошибки, нет тоста, нет подсветки."
+  match_predicate:
+    keywords_any:
+      - "ошибк"
+      - "error"
+      - "сообщени"
+      - "message"
+      - "feedback"
+      - "обратная связь"
+      - "toast"
+      - "красная рамка"
+      - "border"
+      - "подсветк"
+      - "highlight"
+      - "молча"
+      - "silent"
+      - "ничего не происходит"
+      - "no feedback"
+      - "пуст"
+      - "empty"
+      - "обязательн"
+      - "required"
+      - "тихо"
+    page_url_regex: "/signup/step1"
+
+- id: FORM-006
+  category: visual
+  severity: low
+  trigger: "Откройте /signup/step3 после прохождения шагов 1 и 2."
+  expected: "Кнопка отправки должна быть на русском (например, 'Зарегистрироваться' или 'Готово'), как и остальной UI."
+  actual: "Кнопка подписана 'Continue' на английском, тогда как весь остальной интерфейс — на русском."
+  match_predicate:
+    keywords_any:
+      - "continue"
+      - "английск"
+      - "english"
+      - "локализ"
+      - "localization"
+      - "i18n"
+      - "перевод"
+      - "translation"
+      - "кнопк"
+      - "button"
+      - "label"
+      - "надпис"
+      - "язык"
+      - "language"
+      - "русск"
+      - "russian"
+      - "несоответств"
+      - "mixed language"
+      - "опечатк"
+    page_url_regex: "/signup/step3$"
+
+# Deliberate non-bugs (false-positive bait):
+# - На лендинге намеренно нет картинок/иллюстраций — это дизайн-выбор.
+# - Поле "Имя" на шаге 1 необязательное — спецификация формы, не bug.
+# - Нет требований к сложности пароля (длина, спецсимволы) — намеренно.
+# - Прогресс-индикатор не кликабельный — это просто визуальный маркер.
