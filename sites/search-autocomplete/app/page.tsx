@@ -96,7 +96,7 @@ export default function SearchPage() {
   // when clicking outside the search wrapper. The dropdown stays open until
   // the user explicitly blurs or submits. Correct: useEffect with a
   // mousedown listener that checks `wrapRef.current?.contains(e.target)`.
-  const wrapRef = React.useRef<HTMLDivElement>(null)
+  const wrapRef = React.useRef<HTMLFormElement>(null)
 
   return (
     <>
