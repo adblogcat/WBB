@@ -30,7 +30,8 @@ import re
 from dataclasses import dataclass, field
 from typing import Any
 
-from .ground_truth import GroundTruthBug, bug_matches
+from .ground_truth import GroundTruthBug, bug_matches as regex_bug_matches
+from .llm_matcher import llm_bug_matches
 
 # Bug ``source`` values produced by passive detectors. The agent's
 # scenario LLM path emits ``agent_scenario``; these come from background
@@ -40,6 +41,10 @@ DETECTOR_SOURCES = frozenset({
     "detector_dom",
     "detector_console",
     "detector_network",
+    # iter#15.1: agent's [Agent]/[Judge] meta-bugs are now stamped with
+    # this source on the cell side (agent_graph.py). Old runs still use
+    # 'agent_scenario' for them — title-prefix guard below catches those.
+    "detector_internal",
 })
 
 
@@ -56,8 +61,15 @@ def _is_detector(reported: dict[str, Any]) -> bool:
     prov = reported.get("provenance") or {}
     if isinstance(prov, dict) and prov.get("hallucinated") is True:
         return True
-    title = str(reported.get("title", "") or "").lower()
+    # iter#15.1: catch [Agent] and [Judge] meta-bugs even when they're
+    # written under source='agent_scenario' (older agent images, replay
+    # data). On lovable iter#15 run, "[Judge] scenario did not actually
+    # pass" had a 200-char actual_result with enough GT keywords to
+    # false-match BUG-002/003/004 and fake F1 to 0.857.
+    title = str(reported.get("title", "") or "").lower().lstrip()
     if title.startswith("[agent] claimed action"):
+        return True
+    if title.startswith("[judge] "):
         return True
     return False
 
@@ -125,6 +137,10 @@ class ScoreReport:
     # for finding *more* real defects, not fewer.
     detector_findings_count: int = 0
     detector_findings_titles: list[str] = field(default_factory=list)
+    # iter#15.1: per-(gt,reported) match decisions from the LLM matcher
+    # (or regex fallback). Surfaced so the operator can audit *why* an F1
+    # number landed where it did instead of taking it on faith.
+    match_audit: list[dict[str, Any]] = field(default_factory=list)
     precision: float = 0.0
     recall: float = 0.0
     f1: float = 0.0
@@ -139,6 +155,7 @@ class ScoreReport:
             "false_positive_titles": self.false_positive_titles,
             "detector_findings_count": self.detector_findings_count,
             "detector_findings_titles": self.detector_findings_titles,
+            "match_audit": self.match_audit,
             "precision": round(self.precision, 4),
             "recall": round(self.recall, 4),
             "f1": round(self.f1, 4),
@@ -161,10 +178,22 @@ def score(
 
     matched_gt_ids: set[str] = set()
     matched_reported_indices: set[int] = set()
+    match_audit: list[dict[str, Any]] = []
 
     for gt in ground_truth:
         for idx, rep in enumerate(scoring_bugs):
-            if bug_matches(rep, gt):
+            # iter#15.1: LLM matcher with regex fallback. See llm_matcher.py
+            # for the rationale (regex keyword matching was both too liberal
+            # and too brittle, see WBB iter#15 retro).
+            verdict = llm_bug_matches(rep, gt)
+            match_audit.append({
+                "gt_id": gt.id,
+                "reported_title": str(rep.get("title", ""))[:100],
+                "match": verdict.is_match,
+                "source": verdict.source,
+                "reason": verdict.reason,
+            })
+            if verdict.is_match:
                 matched_gt_ids.add(gt.id)
                 matched_reported_indices.add(idx)
                 break  # one match is enough; same reported bug may cover several GTs
@@ -204,6 +233,7 @@ def score(
         detector_findings_titles=[
             str(b.get("title", "(no title)")) for b in detector_bugs
         ],
+        match_audit=match_audit,
         precision=precision,
         recall=recall,
         f1=f1,
