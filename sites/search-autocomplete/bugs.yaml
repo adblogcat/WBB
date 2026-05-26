@@ -1,0 +1,158 @@
+# Ground truth for search-autocomplete.test.vibecrew.space
+# Each entry is an intentionally planted defect. The evaluator scores
+# agent runs by matching reported bugs to these entries via match_predicate.
+
+- id: SEARCH-001
+  category: function
+  severity: high
+  trigger: "Введите 'mac' в поле поиска, дождитесь dropdown, кликните на любое предложение (например, 'MacBook Air M3')."
+  expected: "Input должен заполниться выбранным названием, и должен сработать поиск."
+  actual: "Поиск срабатывает, но input остаётся прежним ('mac'), а не заполняется именем выбранного suggestion."
+  match_predicate:
+    keywords_any:
+      - "suggestion"
+      - "подсказк"
+      - "автодополн"
+      - "autocomplete"
+      - "клик"
+      - "click"
+      - "fill"
+      - "заполн"
+      - "input"
+      - "поле"
+      - "dropdown"
+      - "выбор"
+      - "не подставляет"
+      - "не заполняет"
+      - "не fill"
+    page_url_regex: "(/$|/search)"
+
+- id: SEARCH-002
+  category: data
+  severity: critical
+  trigger: "Введите 'a' и затем второй символ (например 'ap'), посмотрите сколько suggestions в dropdown."
+  expected: "До 8 suggestions должны отображаться согласно спецификации."
+  actual: "Dropdown показывает максимум 3 suggestion вместо 8."
+  match_predicate:
+    keywords_any:
+      - "suggestion"
+      - "подсказк"
+      - "dropdown"
+      - "8"
+      - "3"
+      - "limit"
+      - "лимит"
+      - "max"
+      - "максимум"
+      - "slice"
+      - "обрез"
+      - "только три"
+      - "only 3"
+      - "spec"
+      - "спец"
+    page_url_regex: "(/$|/search)"
+
+- id: SEARCH-003
+  category: function
+  severity: high
+  trigger: "Выполните поиск 'paris'. Затем повторите тот же запрос 'paris' ещё раз. Посмотрите 'Недавние поисковые запросы'."
+  expected: "Один и тот же запрос не должен дублироваться в истории — должен оставаться один экземпляр."
+  actual: "Каждое повторение добавляет ещё одну строку: история содержит несколько одинаковых 'paris'."
+  match_predicate:
+    keywords_any:
+      - "недавн"
+      - "history"
+      - "истори"
+      - "recent"
+      - "дубл"
+      - "duplicate"
+      - "повтор"
+      - "dedupe"
+      - "уникальн"
+      - "unique"
+      - "одинаков"
+      - "несколько раз"
+      - "повторяется"
+      - "twice"
+      - "запрос дублируется"
+    page_url_regex: "(/$|/search)"
+
+- id: SEARCH-004
+  category: usability
+  severity: medium
+  trigger: "Выполните несколько поисков, нажмите 'Очистить историю', затем снова введите ту же букву в поиск."
+  expected: "Dropdown должен показывать актуальные suggestions, пересчитанные под текущий ввод."
+  actual: "Dropdown с suggestions всегда показывает старые/устаревшие предложения — кэш не обновляется после очистки."
+  match_predicate:
+    keywords_any:
+      - "очистить"
+      - "clear"
+      - "кэш"
+      - "cache"
+      - "устарев"
+      - "stale"
+      - "обновл"
+      - "refresh"
+      - "не пересчит"
+      - "useState"
+      - "useMemo"
+      - "suggestion"
+      - "подсказк"
+      - "dropdown"
+      - "старые"
+    page_url_regex: "(/$|/search)"
+
+- id: SEARCH-005
+  category: function
+  severity: medium
+  trigger: "Введите в поиск 'naive' (без диакритики) — в данных есть 'Naïve Bayes Explained' и 'Naïve Vinaigrette'."
+  expected: "Должна быть нормализация Unicode (NFD strip diacritics) — поиск 'naive' находит 'naïve'."
+  actual: "Простой includes() без нормализации — 'naive' не находит 'naïve', результаты неполные."
+  match_predicate:
+    keywords_any:
+      - "диакритик"
+      - "diacritic"
+      - "unicode"
+      - "юникод"
+      - "normaliz"
+      - "нормализац"
+      - "NFD"
+      - "naive"
+      - "naïve"
+      - "accent"
+      - "ударен"
+      - "ё"
+      - "ï"
+      - "не находит"
+      - "пропускает"
+    page_url_regex: "(/$|/search)"
+
+- id: SEARCH-006
+  category: visual
+  severity: low
+  trigger: "Введите запрос, чтобы появился dropdown. Затем кликните в произвольное место страницы вне поля поиска и dropdown."
+  expected: "Dropdown должен закрываться при клике вне него (стандартный click-outside поведение)."
+  actual: "Dropdown остаётся открытым после клика вне него — нет document-level click handler."
+  match_predicate:
+    keywords_any:
+      - "click outside"
+      - "клик вне"
+      - "не закрывается"
+      - "остаётся открыт"
+      - "dropdown"
+      - "stays open"
+      - "outside click"
+      - "document listener"
+      - "blur"
+      - "фокус"
+      - "useEffect"
+      - "click-outside"
+      - "за пределами"
+      - "вне поля"
+      - "вне dropdown"
+    page_url_regex: "(/$|/search)"
+
+# Deliberate non-bugs (false-positive bait):
+# - Сайт one-page (нет роутинга /search) — это намеренный дизайн.
+# - Иконок и аватарок в результатах нет — спецификация, не bug.
+# - Категории не кликабельны (не фильтруют) — фича вне scope этого сайта.

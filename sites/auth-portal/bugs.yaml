@@ -1,0 +1,158 @@
+# Ground truth for auth-portal.test.vibecrew.space
+# Each entry is an intentionally planted defect. The evaluator scores
+# agent runs by matching reported bugs to these entries via match_predicate.
+
+- id: AUTH-001
+  category: function
+  severity: critical
+  trigger: "На странице /login введите любой email и заведомо неверный пароль, нажмите 'Войти'."
+  expected: "Должна появиться ошибка вида 'Неверный email или пароль', переход на /account запрещён."
+  actual: "Логин принимает любой пароль и сразу открывает /account — проверка пароля отсутствует."
+  match_predicate:
+    keywords_any:
+      - "пароль"
+      - "password"
+      - "вход"
+      - "login"
+      - "неверн"
+      - "wrong"
+      - "invalid"
+      - "проверк"
+      - "validation"
+      - "любой пароль"
+      - "any password"
+      - "без проверк"
+      - "бэкдор"
+      - "обход авторизации"
+      - "auth bypass"
+    page_url_regex: "(/login|/account)"
+
+- id: AUTH-002
+  category: function
+  severity: high
+  trigger: "На странице /signup заполните email, пароль и подтверждение, оставьте чекбокс 'Согласен с условиями' пустым, нажмите 'Создать'."
+  expected: "Кнопка 'Создать' заблокирована или показывается ошибка о необходимости согласия с условиями."
+  actual: "Регистрация проходит успешно даже без галочки — чекбокс игнорируется обработчиком submit."
+  match_predicate:
+    keywords_any:
+      - "чекбокс"
+      - "checkbox"
+      - "согласие"
+      - "условия"
+      - "terms"
+      - "agreement"
+      - "не проверяется"
+      - "ignored"
+      - "галочк"
+      - "без галочк"
+      - "регистрац"
+      - "signup"
+      - "пропускает"
+      - "согласен"
+      - "consent"
+    page_url_regex: "/signup"
+
+- id: AUTH-003
+  category: data
+  severity: critical
+  trigger: "Зарегистрируйте пользователя с email test@example.com и паролем A, выйдите из аккаунта, затем зарегистрируйте снова с тем же email и паролем B."
+  expected: "Вторая регистрация должна быть отклонена с ошибкой 'Пользователь с таким email уже существует'."
+  actual: "Второй signup перезаписывает запись в localStorage (wbb-auth-users) — старый пароль теряется без предупреждения."
+  match_predicate:
+    keywords_any:
+      - "дубликат"
+      - "duplicate"
+      - "уже существует"
+      - "already exists"
+      - "перезапис"
+      - "overwrite"
+      - "потер"
+      - "lost"
+      - "email уже"
+      - "повторн"
+      - "регистрац"
+      - "signup"
+      - "localStorage"
+      - "уникальн"
+      - "unique"
+    page_url_regex: "/signup"
+
+- id: AUTH-004
+  category: usability
+  severity: high
+  trigger: "На странице /forgot введите email, нажмите 'Отправить код'."
+  expected: "Должен открыться экран с вводом 6-значного кода (шаг 2 из 3)."
+  actual: "После step 1 интерфейс перескакивает на экран ввода нового пароля (step 3) — шаг с кодом полностью пропускается."
+  match_predicate:
+    keywords_any:
+      - "шаг"
+      - "step"
+      - "пропуск"
+      - "skipped"
+      - "код"
+      - "code"
+      - "восстановлен"
+      - "reset"
+      - "forgot"
+      - "multi-step"
+      - "мультишаг"
+      - "перескак"
+      - "step 2"
+      - "step 3"
+      - "6-значн"
+    page_url_regex: "/forgot"
+
+- id: AUTH-005
+  category: function
+  severity: medium
+  trigger: "Войдите в аккаунт, на странице /account нажмите 'Выйти', затем снова откройте /account."
+  expected: "После logout localStorage очищен, /account показывает гостя или редиректит на /login."
+  actual: "Кнопка 'Выйти' только делает router.push('/'), но wbb-auth-session не очищается — повторный заход на /account показывает старого пользователя (автологин)."
+  match_predicate:
+    keywords_any:
+      - "logout"
+      - "выход"
+      - "выйти"
+      - "session"
+      - "сесси"
+      - "localStorage"
+      - "не очищ"
+      - "not cleared"
+      - "автологин"
+      - "auto-login"
+      - "remains"
+      - "остаётся"
+      - "clearSession"
+      - "повторный заход"
+      - "stale session"
+    page_url_regex: "/account"
+
+- id: AUTH-006
+  category: visual
+  severity: low
+  trigger: "На странице /signup быстро дважды кликните по кнопке 'Создать' с валидными данными."
+  expected: "После первого клика кнопка должна стать disabled и показывать loading-состояние (спиннер или текст 'Создаём...')."
+  actual: "Кнопка не блокируется и не показывает индикатор загрузки — пользователь может кликнуть несколько раз подряд."
+  match_predicate:
+    keywords_any:
+      - "loading"
+      - "загрузк"
+      - "спиннер"
+      - "spinner"
+      - "disabled"
+      - "заблокир"
+      - "double-click"
+      - "двойн"
+      - "повторн"
+      - "indicator"
+      - "индикатор"
+      - "состояние кнопки"
+      - "submit state"
+      - "feedback"
+      - "обратная связь"
+    page_url_regex: "/signup"
+
+# Deliberate non-bugs (false-positive bait):
+# - Тексты "демо-режим" в forgot — намеренное упрощение, не bug.
+# - Отсутствие требований к сложности пароля — спецификация демо, не bug.
+# - Email не нормализуется к lowercase — намеренно (демо-портал).

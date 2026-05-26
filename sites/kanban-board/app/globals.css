@@ -1,0 +1,59 @@
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Inter, sans-serif; color: #18181b; background: #f4f5f7; }
+a { color: inherit; text-decoration: none; }
+
+.nav { background: white; border-bottom: 1px solid #e5e5e5; padding: 14px 24px; display: flex; gap: 24px; align-items: center; }
+.nav-brand { font-weight: 700; font-size: 18px; }
+.nav-link { color: #525252; font-size: 14px; }
+
+.container { max-width: 1400px; margin: 0 auto; padding: 24px; }
+.hero { padding: 12px 0 20px; }
+.hero h1 { font-size: 24px; margin: 0 0 6px; }
+.hero p { color: #525252; margin: 0; font-size: 14px; }
+
+.filters { display: flex; gap: 8px; align-items: center; margin: 16px 0 20px; flex-wrap: wrap; }
+.filters-label { font-size: 13px; color: #71717a; margin-right: 4px; }
+.chip { padding: 6px 12px; border: 1px solid #d4d4d8; background: white; border-radius: 999px; font-size: 13px; cursor: pointer; user-select: none; transition: all 0.1s; }
+.chip:hover { border-color: #a1a1aa; }
+.chip-active { background: #18181b; color: white; border-color: #18181b; }
+.chip-clear { margin-left: auto; background: transparent; border: none; color: #71717a; font-size: 13px; cursor: pointer; }
+.chip-clear:hover { color: #18181b; }
+
+.board { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+.column { background: #ebecf0; border-radius: 10px; padding: 12px; display: flex; flex-direction: column; gap: 10px; min-height: 200px; }
+.column-drag-over { background: #d8e1ec; outline: 2px dashed #6b7c93; }
+.column-header { display: flex; justify-content: space-between; align-items: center; padding: 4px 4px 8px; }
+.column-title { font-weight: 600; font-size: 14px; color: #42526e; text-transform: uppercase; letter-spacing: 0.5px; }
+.column-count { background: #dfe1e6; color: #42526e; font-size: 12px; padding: 2px 8px; border-radius: 10px; font-weight: 600; }
+
+.card { background: white; border-radius: 6px; padding: 12px; box-shadow: 0 1px 0 rgba(9,30,66,0.25); cursor: grab; display: flex; flex-direction: column; gap: 8px; }
+.card:hover { background: #fafbfc; }
+.card:active { cursor: grabbing; }
+.card-dragging { opacity: 0.4; }
+.card-title { font-size: 14px; font-weight: 500; line-height: 1.4; color: #172b4d; }
+.card-meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.card-label { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 4px; text-transform: uppercase; letter-spacing: 0.3px; }
+.label-Bug { background: #ffebe6; color: #bf2600; }
+.label-Feature { background: #deebff; color: #0747a6; }
+.label-Chore { background: #eae6ff; color: #403294; }
+.label-Docs { background: #e3fcef; color: #006644; }
+.card-spacer { flex: 1; }
+.card-priority { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+.card-avatar { width: 26px; height: 26px; border-radius: 50%; background: #5e6c84; color: white; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+
+.add-card-btn { background: transparent; border: none; color: #5e6c84; padding: 8px; border-radius: 6px; cursor: pointer; font-size: 13px; text-align: left; }
+.add-card-btn:hover { background: rgba(9,30,66,0.08); color: #172b4d; }
+
+.modal-overlay { position: fixed; inset: 0; background: rgba(9,30,66,0.54); display: flex; align-items: center; justify-content: center; z-index: 100; padding: 16px; }
+.modal { background: white; border-radius: 8px; padding: 24px; width: 100%; max-width: 480px; box-shadow: 0 8px 32px rgba(9,30,66,0.25); }
+.modal h2 { margin: 0 0 16px; font-size: 18px; }
+.field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
+.field label { font-size: 12px; font-weight: 600; color: #42526e; text-transform: uppercase; letter-spacing: 0.4px; }
+.field input, .field select { padding: 8px 10px; border: 2px solid #dfe1e6; border-radius: 4px; font-size: 14px; font-family: inherit; }
+.field input:focus, .field select:focus { outline: none; border-color: #4c9aff; }
+.modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 20px; }
+
+.btn { padding: 8px 16px; border: none; background: #0052cc; color: white; border-radius: 4px; font-size: 14px; font-weight: 500; cursor: pointer; }
+.btn:hover { background: #0747a6; }
+.btn-secondary { background: #f4f5f7; color: #42526e; }
+.btn-secondary:hover { background: #ebecf0; }

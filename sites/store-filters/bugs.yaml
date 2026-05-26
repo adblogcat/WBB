@@ -1,0 +1,153 @@
+# Ground truth for store-filters.test.vibecrew.space
+# Each entry is an intentionally planted defect. The evaluator scores
+# agent runs by matching reported bugs to these entries via match_predicate.
+# Single-page site — no page_url_regex used.
+
+- id: STORE-001
+  category: function
+  severity: critical
+  trigger: "В сайдбаре фильтров выберите в селекте 'Категория' значение 'Книги'."
+  expected: "Каталог сразу фильтруется по выбранной категории — остаются только книги."
+  actual: "Первое изменение селекта не применяется (показываются все товары), фильтр срабатывает только после повторного переключения категории."
+  match_predicate:
+    keywords_any:
+      - "категори"
+      - "category"
+      - "select"
+      - "селект"
+      - "stale"
+      - "устаревш"
+      - "previous state"
+      - "первое изменение"
+      - "дважды"
+      - "twice"
+      - "onChange"
+      - "не применяется"
+      - "не срабатывает"
+      - "книги"
+      - "books"
+
+- id: STORE-002
+  category: function
+  severity: high
+  trigger: "Выберите категорию 'Электроника', затем в селекте бренда выберите 'Sony'."
+  expected: "Должны показаться только товары Sony в категории Электроника (AND-логика фильтров)."
+  actual: "Показываются товары Sony из всех категорий — книги, одежда, спорт — а не только электроника. Логика фильтров OR вместо AND."
+  match_predicate:
+    keywords_any:
+      - "бренд"
+      - "brand"
+      - "AND"
+      - "OR"
+      - "пересечение"
+      - "комбинац"
+      - "combined"
+      - "Sony"
+      - "Электроника"
+      - "filter logic"
+      - "логика фильтр"
+      - "лишн"
+      - "не из той категории"
+      - "all categories"
+      - "из всех категорий"
+
+- id: STORE-003
+  category: data
+  severity: high
+  trigger: "Подвиньте правый (max) ползунок цены с 100000 до 5000. Левый (min) оставьте на 0."
+  expected: "В каталоге остаются только товары дешевле 5000₽."
+  actual: "Товары дороже 5000₽ остаются в списке — верхняя граница диапазона цены игнорируется фильтром. Применяется только нижняя граница (min)."
+  match_predicate:
+    keywords_any:
+      - "цена"
+      - "price"
+      - "диапазон"
+      - "range"
+      - "слайдер"
+      - "slider"
+      - "ползунок"
+      - "max"
+      - "верхняя граница"
+      - "upper bound"
+      - "игнорируется"
+      - "ignored"
+      - "дороже"
+      - "не применяется max"
+      - "только min"
+
+- id: STORE-004
+  category: function
+  severity: medium
+  trigger: "Откройте страницу каталога и посмотрите на чекбокс 'Только в наличии' в сайдбаре."
+  expected: "Если галочка стоит — должны показаться только товары с inStock=true (без 'Нет в наличии')."
+  actual: "Чекбокс выглядит включённым по умолчанию, но в каталоге всё равно есть товары с пометкой 'Нет в наличии'. Состояние UI рассинхронизировано с фильтром (defaultChecked vs initial state false)."
+  match_predicate:
+    keywords_any:
+      - "в наличии"
+      - "stock"
+      - "out of stock"
+      - "чекбокс"
+      - "checkbox"
+      - "галочка"
+      - "defaultChecked"
+      - "initial state"
+      - "рассинхрон"
+      - "desync"
+      - "не фильтрует"
+      - "включён"
+      - "не работает"
+      - "состояние"
+      - "Нет в наличии"
+
+- id: STORE-005
+  category: visual
+  severity: medium
+  trigger: "Примените любой фильтр, который сокращает список (например, бренд 'Apple')."
+  expected: "Надпись 'Найдено: N товаров' должна показывать количество отфильтрованных товаров."
+  actual: "Счётчик 'Найдено' всегда показывает общее количество товаров в каталоге (45), а не количество отфильтрованных результатов."
+  match_predicate:
+    keywords_any:
+      - "счётчик"
+      - "счетчик"
+      - "counter"
+      - "найдено"
+      - "found"
+      - "количество"
+      - "count"
+      - "total"
+      - "общее"
+      - "не обновляется"
+      - "не пересчитывается"
+      - "PRODUCTS.length"
+      - "filtered.length"
+      - "неверное число"
+      - "wrong count"
+
+- id: STORE-006
+  category: function
+  severity: medium
+  trigger: "В блоке 'Цвет' поставьте галочку на 'красный', затем на 'синий'."
+  expected: "Оба чекбокса остаются выбранными, в каталоге показываются красные ИЛИ синие товары (additive)."
+  actual: "При клике на 'синий' галочка с 'красного' снимается — чекбоксы ведут себя как радиокнопки (mutually exclusive). Нельзя выбрать несколько цветов одновременно."
+  match_predicate:
+    keywords_any:
+      - "цвет"
+      - "color"
+      - "несколько"
+      - "multiple"
+      - "одновременно"
+      - "additive"
+      - "радио"
+      - "radio"
+      - "mutually exclusive"
+      - "взаимоисключ"
+      - "снимается"
+      - "deselect"
+      - "сбрасывает"
+      - "красный"
+      - "синий"
+
+# Deliberate non-bugs (false-positive bait):
+# - Sticky sidebar на десктопе — это дизайн-выбор.
+# - Карточки товаров без кнопки "В корзину" — это каталог без оформления заказа.
+# - Слайдеры цены min/max могут пересекаться — UX-выбор для простоты.

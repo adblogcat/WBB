@@ -1,0 +1,147 @@
+# Ground truth for booking-calendar.test.vibecrew.space
+# Each entry is an intentionally planted defect. The evaluator scores
+# agent runs by matching reported bugs to these entries via match_predicate.
+
+- id: BOOK-001
+  category: function
+  severity: high
+  trigger: "На странице /booking введите в поле «Дата» вчерашнее число (или прошлый месяц) и нажмите 'Подтвердить бронирование'."
+  expected: "Сайт должен отклонить дату в прошлом — либо браузер не даст её ввести, либо появится ошибка валидации."
+  actual: "Форма принимает прошлую дату и открывает модалку подтверждения как ни в чём не бывало. Атрибут min={today} есть, но JS-проверки нет."
+  match_predicate:
+    keywords_any:
+      - "дата"
+      - "date"
+      - "прошл"
+      - "past"
+      - "вчера"
+      - "yesterday"
+      - "min"
+      - "min="
+      - "min attribute"
+      - "валидац"
+      - "validation"
+      - "past date"
+      - "в прошлом"
+      - "историческ"
+      - "не валидирует"
+
+- id: BOOK-002
+  category: function
+  severity: critical
+  trigger: "На странице /booking в поле «Время» введите 03:00 или 23:30 и нажмите 'Подтвердить бронирование'."
+  expected: "Время вне рабочих часов 11:00–22:00 должно быть отклонено с явной ошибкой."
+  actual: "Форма принимает любое время суток — нет ни min/max на input, ни client-side проверки диапазона."
+  match_predicate:
+    keywords_any:
+      - "время"
+      - "time"
+      - "часы"
+      - "hours"
+      - "рабочи"
+      - "working hours"
+      - "11:00"
+      - "22:00"
+      - "03:00"
+      - "23:30"
+      - "диапазон"
+      - "range"
+      - "вне"
+      - "out of range"
+      - "min/max"
+
+- id: BOOK-003
+  category: usability
+  severity: high
+  trigger: "На странице /booking в группе «Гости» кликните по тексту цифры (например, по '4'), а не по самому кружку radio."
+  expected: "Клик по тексту/подписи рядом с radio должен переключать выбор (label связан с input через htmlFor)."
+  actual: "Клик по подписи ничего не делает — нужно попасть в крошечный кружок. <label> не связан с <input> через htmlFor/id."
+  match_predicate:
+    keywords_any:
+      - "label"
+      - "подпис"
+      - "радио"
+      - "radio"
+      - "гости"
+      - "guests"
+      - "htmlFor"
+      - "for="
+      - "клик"
+      - "click"
+      - "не выбирает"
+      - "не переключает"
+      - "ассоциац"
+      - "association"
+      - "доступн"
+
+- id: BOOK-004
+  category: function
+  severity: critical
+  trigger: "На странице /booking оставьте поля «Имя» и «Email» пустыми, выберите дату/время и нажмите 'Подтвердить бронирование', затем в модалке нажмите 'Подтвердить'."
+  expected: "Сабмит с пустыми обязательными полями должен быть заблокирован — модалка не открывается, или 'Подтвердить' в модалке отклоняет пустую бронь."
+  actual: "Модалка открывается без валидации, и клик 'Подтвердить' регистрирует пустую бронь (имя и email — пустые строки)."
+  match_predicate:
+    keywords_any:
+      - "required"
+      - "обязательн"
+      - "пуст"
+      - "empty"
+      - "validation"
+      - "валидац"
+      - "имя"
+      - "name"
+      - "email"
+      - "пустая бронь"
+      - "no validation"
+      - "не проверяет"
+      - "submit"
+      - "сабмит"
+      - "blank"
+
+- id: BOOK-005
+  category: usability
+  severity: medium
+  trigger: "На странице /booking откройте модалку подтверждения и нажмите клавишу Escape."
+  expected: "Модалка должна закрываться по Escape (стандартное поведение dialog)."
+  actual: "Escape игнорируется — обработчик keydown не подключён, модалка остаётся открытой. Закрыть можно только кнопкой 'Отмена' или кликом по фону."
+  match_predicate:
+    keywords_any:
+      - "escape"
+      - "esc"
+      - "клавиш"
+      - "key"
+      - "keydown"
+      - "модал"
+      - "modal"
+      - "dialog"
+      - "диалог"
+      - "не закрывается"
+      - "doesn't close"
+      - "клавиатур"
+      - "keyboard"
+      - "a11y"
+      - "доступн"
+
+- id: BOOK-006
+  category: function
+  severity: medium
+  trigger: "На странице /booking заполните форму, откройте модалку и нажмите 'Отмена'. Теперь начните бронировать заново."
+  expected: "Клик 'Отмена' должен сбросить форму (или хотя бы спросить), чтобы повторное бронирование начиналось с чистых полей."
+  actual: "Кнопка 'Отмена' только закрывает модалку — все поля формы остаются заполненными старыми значениями, что путает пользователя."
+  match_predicate:
+    keywords_any:
+      - "отмена"
+      - "cancel"
+      - "reset"
+      - "сброс"
+      - "очист"
+      - "clear"
+      - "форма"
+      - "form"
+      - "старые значения"
+      - "stale"
+      - "previous values"
+      - "не сбрасыва"
+      - "сохраняет"
+      - "повторн"
+      - "repeat booking"
