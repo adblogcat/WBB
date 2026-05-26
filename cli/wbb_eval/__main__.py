@@ -2,7 +2,9 @@
 
 Usage:
     python -m wbb_eval run --site ecom-mini
-    python -m wbb_eval run --all
+    python -m wbb_eval run --sites store-filters,booking-calendar      # parallel by default
+    python -m wbb_eval run --all                                       # parallel by default
+    python -m wbb_eval run --all --sequential                          # disable parallelism
 """
 from __future__ import annotations
 
@@ -11,6 +13,7 @@ import json
 import os
 import sys
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 from .ground_truth import load_ground_truth
@@ -76,22 +79,41 @@ def cmd_run(args: argparse.Namespace) -> int:
         return 2
 
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
-    reports = []
-    for slug in slugs:
+    reports: list[dict] = []
+
+    def _execute(slug: str) -> dict:
         try:
-            rep = run_one(slug, api_url=args.api_url)
+            return run_one(slug, api_url=args.api_url)
         except QabotError as exc:
-            rep = {
+            return {
                 "site_id": slug,
                 "error": str(exc),
                 "precision": 0.0,
                 "recall": 0.0,
                 "f1": 0.0,
             }
-        reports.append(rep)
-        out = RESULTS_DIR / f"{slug}-{int(time.time())}.json"
-        out.write_text(json.dumps(rep, indent=2, ensure_ascii=False))
-        print(f"[run] saved {out}\n", flush=True)
+
+    parallel = (not args.sequential) and len(slugs) > 1
+    if parallel:
+        # Each site is independent — different qabot task, different cell
+        # pod. Run them concurrently to shrink wall-clock. The qabot
+        # orchestrator has a maxConcurrentJobs=50 cap so 8-10 in flight
+        # is well within budget.
+        with ThreadPoolExecutor(max_workers=len(slugs)) as pool:
+            futures = {pool.submit(_execute, s): s for s in slugs}
+            for fut in as_completed(futures):
+                rep = fut.result()
+                reports.append(rep)
+                out = RESULTS_DIR / f"{rep['site_id']}-{int(time.time())}.json"
+                out.write_text(json.dumps(rep, indent=2, ensure_ascii=False))
+                print(f"[run] saved {out}\n", flush=True)
+    else:
+        for slug in slugs:
+            rep = _execute(slug)
+            reports.append(rep)
+            out = RESULTS_DIR / f"{slug}-{int(time.time())}.json"
+            out.write_text(json.dumps(rep, indent=2, ensure_ascii=False))
+            print(f"[run] saved {out}\n", flush=True)
 
     # Aggregate
     n = len(reports)
@@ -122,6 +144,11 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--site", help="single site slug under sites/")
     run.add_argument("--sites", help="comma-separated slugs: --sites store-filters,auth-portal")
     run.add_argument("--all", action="store_true", help="run every site with bugs.yaml")
+    run.add_argument(
+        "--sequential",
+        action="store_true",
+        help="force sequential execution (default: parallel when multiple sites)",
+    )
     run.add_argument("--api-url", default=DEFAULT_API_URL)
     run.set_defaults(func=cmd_run)
 
