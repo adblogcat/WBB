@@ -48,8 +48,16 @@ def submit_task(
     project_id: str | None = None,
     viewport: dict[str, int] | None = None,
     api_url: str = DEFAULT_API_URL,
+    max_attempts: int = 4,
 ) -> str:
-    """POST /api/v1/tasks — returns task_id."""
+    """POST /api/v1/tasks — returns task_id.
+
+    Retries on transient failures (5xx, non-JSON bodies, connect errors)
+    so a backend rolling restart during a parallel WBB run doesn't kill
+    the whole submission batch. We saw exactly this hit a 5-site run
+    submitted ~90s after a backend rollout — one of the pods was still
+    coming up and returned an empty body. Exponential backoff: 1→2→4s.
+    """
     payload: dict[str, Any] = {
         "url": url,
         "browsers": ["chromium"],
@@ -57,19 +65,45 @@ def submit_task(
     }
     if project_id:
         payload["project_id"] = project_id
-    with httpx.Client(timeout=30.0) as client:
-        resp = client.post(
-            f"{api_url}/v1/tasks",
-            json=payload,
-            headers=_auth_headers(),
-        )
-    if resp.status_code >= 400:
-        raise QabotError(f"submit_task failed: {resp.status_code} {resp.text[:400]}")
-    data = resp.json()
-    task_id = data.get("id") or data.get("task_id")
-    if not task_id:
-        raise QabotError(f"submit_task response missing id: {data}")
-    return str(task_id)
+
+    last_err: str = ""
+    for attempt in range(1, max_attempts + 1):
+        try:
+            with httpx.Client(timeout=30.0) as client:
+                resp = client.post(
+                    f"{api_url}/v1/tasks",
+                    json=payload,
+                    headers=_auth_headers(),
+                )
+        except httpx.HTTPError as exc:
+            last_err = f"connect: {exc!r}"
+        else:
+            if 200 <= resp.status_code < 300:
+                try:
+                    data = resp.json()
+                except ValueError:
+                    last_err = (
+                        f"non-JSON body (HTTP {resp.status_code}): "
+                        f"{resp.text[:200]!r}"
+                    )
+                else:
+                    task_id = data.get("id") or data.get("task_id")
+                    if task_id:
+                        return str(task_id)
+                    last_err = f"response missing id: {data}"
+            elif resp.status_code >= 500:
+                last_err = f"HTTP {resp.status_code}: {resp.text[:200]}"
+            else:
+                # 4xx — likely a real client-side error (bad token, bad
+                # URL). Don't retry; surface immediately.
+                raise QabotError(
+                    f"submit_task failed: HTTP {resp.status_code} {resp.text[:400]}"
+                )
+        if attempt < max_attempts:
+            time.sleep(2 ** (attempt - 1))
+    raise QabotError(
+        f"submit_task gave up after {max_attempts} attempts. last error: {last_err}"
+    )
 
 
 def get_task(task_id: str, *, api_url: str = DEFAULT_API_URL) -> dict[str, Any]:

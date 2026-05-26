@@ -1,0 +1,9 @@
+# External reference site — user-mandated as a permanent eval target.
+# Lives on lovable.app (no-code hosted), not in our k8s, so we override the
+# default `<slug>.test.vibecrew.space` URL composition. CLI reads `url:`
+# from this file before falling back to the subdomain template.
+url: https://test-craft-library-quest.lovable.app
+notes: |
+  Required on every WBB eval cycle per user directive. If lovable.app updates
+  the hosted page and the GT bugs disappear, flag it explicitly — don't silently
+  count zero matches as a pass.

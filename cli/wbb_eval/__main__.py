@@ -16,6 +16,8 @@ import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
+import yaml
+
 from .ground_truth import load_ground_truth
 from .qabot_client import (
     DEFAULT_API_URL,
@@ -32,6 +34,19 @@ RESULTS_DIR = REPO_ROOT / "eval" / "runs"
 
 
 def _site_url(slug: str) -> str:
+    # Sites with a `site.yaml` containing `url:` override the default
+    # `<slug>.test.vibecrew.space` subdomain template. Used for external
+    # reference sites (e.g. lovable.app pages) that the user wants pinned
+    # into every eval cycle without us having to host them ourselves.
+    cfg = SITES_DIR / slug / "site.yaml"
+    if cfg.exists():
+        try:
+            data = yaml.safe_load(cfg.read_text()) or {}
+            override = data.get("url")
+            if isinstance(override, str) and override.strip():
+                return override.strip()
+        except yaml.YAMLError:
+            pass
     return f"https://{slug}.{DEFAULT_DOMAIN_BASE}"
 
 
