@@ -1,5 +1,6 @@
 name: build-sites
-# rebuild trigger 2026-05-26
+# rebuild trigger 2026-05-26 — top-level perms after a default reset
+# made discover/checkout 403 (GITHUB_TOKEN had no contents:read).
 
 on:
   push:
@@ -8,6 +9,10 @@ on:
       - 'sites/**'
       - '.github/workflows/build-sites.yml'
   workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
 
 env:
   REGISTRY: ghcr.io
