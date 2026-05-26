@@ -5,6 +5,7 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 
 import yaml
 
@@ -64,9 +65,16 @@ def bug_matches(reported: dict[str, Any], gt: GroundTruthBug) -> bool:
 
     url_regex = pred.get("page_url_regex")
     if url_regex:
-        url = str(reported.get("url_at_time") or "")
+        raw_url = str(reported.get("url_at_time") or "")
+        # url_at_time may be either a full URL ('https://site/path') or a
+        # bare path ('/path'). Try matching against both forms: the path
+        # alone (so path-only regex like '^/cart$' works) and the full
+        # original string (so regex authors who include the host can do
+        # that too). One side passing is enough.
         try:
-            if not re.search(url_regex, url):
+            parsed = urlparse(raw_url)
+            path = parsed.path or raw_url
+            if not (re.search(url_regex, path) or re.search(url_regex, raw_url)):
                 return False
         except re.error:
             pass  # malformed regex — don't fail the match on operator error
