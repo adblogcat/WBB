@@ -1,8 +1,8 @@
 """Score one agent run vs one site's ground truth.
 
 A ground-truth bug is "covered" when at least one reported bug matches it.
-Precision = covered / total_reported (reported bugs not matching any GT
-are counted as false positives).
+Precision = covered / total_unique_reported (reported bugs not matching
+any GT and not fuzzy-duplicates of other FPs are counted once).
 Recall = covered / total_GT.
 F1 = harmonic mean.
 
@@ -12,9 +12,21 @@ legitimate findings of a different class (universal a11y/console
 defects) that we surface separately in ``detector_findings_count``.
 Including them as FPs would penalize the agent for finding extra
 real bugs that just happen to not be on this site's bespoke GT.
+
+Iter#8: scoring-side fuzzy dedup of false positives. The backend
+deduplicates by signature_hash (cat + normalised title + url +
+component) which silently collapses identical reports, but syntactic
+title variations ('Кнопка Далее не реагирует' vs 'Кнопка «Далее»
+не реагирует на нажатие') hash differently and produce many rows
+the agent meant as one. Without fuzzy dedup precision is dragged by
+self-duplication, not by genuine over-reporting.
+
+Dedup rule: token-Jaccard >= 0.55 (case-folded, punctuation stripped,
+short stopwords dropped) → fold into a single FP bucket.
 """
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -34,6 +46,55 @@ DETECTOR_SOURCES = frozenset({
 def _is_detector(reported: dict[str, Any]) -> bool:
     src = str(reported.get("source", "") or "").lower()
     return src in DETECTOR_SOURCES
+
+
+# Iter#8 fuzzy dedup helpers. Short stopwords (RU + EN) that flood
+# titles without carrying semantic weight — dropped before Jaccard.
+_FUZZY_STOPWORDS = frozenset({
+    "и", "в", "на", "не", "по", "из", "к", "с", "у", "о", "от",
+    "а", "the", "a", "to", "of", "in", "on", "for", "is", "at",
+    "or", "but", "no", "yes",
+})
+_FUZZY_TOKEN_RE = re.compile(r"[a-zа-я0-9]+", re.IGNORECASE)
+_FUZZY_JACCARD_THRESHOLD = 0.55
+
+
+def _fuzzy_tokens(text: str) -> set[str]:
+    """Tokenise a bug title for fuzzy-similarity comparison."""
+    return {
+        t.lower()
+        for t in _FUZZY_TOKEN_RE.findall(text or "")
+        if len(t) >= 3 and t.lower() not in _FUZZY_STOPWORDS
+    }
+
+
+def _fuzzy_dedup_titles(titles: list[str]) -> list[str]:
+    """Collapse near-duplicate titles via token-Jaccard >= threshold.
+
+    Greedy single-pass: each new title compared against accepted set;
+    if any accepted title has Jaccard >= threshold it's treated as
+    the same bug and dropped. Preserves first-seen ordering.
+    """
+    accepted: list[tuple[str, set[str]]] = []
+    out: list[str] = []
+    for raw in titles:
+        toks = _fuzzy_tokens(raw)
+        if not toks:
+            out.append(raw)  # empty-token titles pass through
+            continue
+        is_dup = False
+        for _, existing in accepted:
+            union = toks | existing
+            if not union:
+                continue
+            jaccard = len(toks & existing) / len(union)
+            if jaccard >= _FUZZY_JACCARD_THRESHOLD:
+                is_dup = True
+                break
+        if not is_dup:
+            accepted.append((raw, toks))
+            out.append(raw)
+    return out
 
 
 @dataclass
@@ -94,15 +155,21 @@ def score(
                 matched_reported_indices.add(idx)
                 break  # one match is enough; same reported bug may cover several GTs
 
-    false_positives = [
+    raw_false_positives = [
         str(scoring_bugs[i].get("title", "(no title)"))
         for i in range(len(scoring_bugs))
         if i not in matched_reported_indices
     ]
+    # Iter#8: collapse fuzzy duplicates among FPs so precision tracks
+    # *distinct* over-reports, not pure repetition. The matched bucket
+    # is left untouched — one true-positive cluster still counts as one
+    # match against ground truth.
+    false_positives = _fuzzy_dedup_titles(raw_false_positives)
 
+    unique_scoring_count = len(matched_reported_indices) + len(false_positives)
     precision = (
-        len(matched_reported_indices) / len(scoring_bugs)
-        if scoring_bugs
+        len(matched_reported_indices) / unique_scoring_count
+        if unique_scoring_count
         else 0.0
     )
     recall = len(matched_gt_ids) / len(ground_truth) if ground_truth else 0.0
