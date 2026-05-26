@@ -62,10 +62,17 @@ def cmd_run(args: argparse.Namespace) -> int:
         slugs = sorted(
             p.name for p in SITES_DIR.iterdir() if (p / "bugs.yaml").exists()
         )
+    elif args.sites:
+        # Comma-separated list of slugs, e.g. --sites store-filters,booking-calendar
+        slugs = [s.strip() for s in args.sites.split(",") if s.strip()]
+        missing = [s for s in slugs if not (SITES_DIR / s / "bugs.yaml").exists()]
+        if missing:
+            print(f"unknown sites: {missing}", file=sys.stderr)
+            return 2
     elif args.site:
         slugs = [args.site]
     else:
-        print("--site SLUG or --all required", file=sys.stderr)
+        print("--site SLUG or --sites a,b,c or --all required", file=sys.stderr)
         return 2
 
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
@@ -112,7 +119,8 @@ def build_parser() -> argparse.ArgumentParser:
     sub = p.add_subparsers(dest="cmd", required=True)
 
     run = sub.add_parser("run", help="submit a site (or all) to qabot and score")
-    run.add_argument("--site", help="site slug under sites/")
+    run.add_argument("--site", help="single site slug under sites/")
+    run.add_argument("--sites", help="comma-separated slugs: --sites store-filters,auth-portal")
     run.add_argument("--all", action="store_true", help="run every site with bugs.yaml")
     run.add_argument("--api-url", default=DEFAULT_API_URL)
     run.set_defaults(func=cmd_run)
