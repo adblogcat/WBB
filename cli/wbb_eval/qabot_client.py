@@ -1,8 +1,10 @@
 """qabot HTTP client — submit a test, poll until done, fetch the bug report.
 
-Auth: uses INTERNAL_SECRET via X-Internal-Secret header (same path the
-orchestrator uses to call the backend). Falls back to bearer if an
-API key is provided instead.
+Auth: ``Authorization: Bearer qab_…`` (issued via /api/api-tokens, scoped
+to ``tasks:create`` + ``tasks:read``). Submit uses /api/v1/tasks (the
+public API-token endpoint); read-back uses /api/tasks/{id} since v1
+doesn't expose a per-task GET yet but the legacy route accepts the same
+bearer through RequireAPIToken middleware.
 """
 from __future__ import annotations
 
@@ -31,33 +33,33 @@ class TaskResult:
 
 
 def _auth_headers() -> dict[str, str]:
-    secret = os.environ.get("QABOT_INTERNAL_SECRET")
-    if not secret:
+    token = os.environ.get("QABOT_API_TOKEN")
+    if not token:
         raise QabotError(
-            "QABOT_INTERNAL_SECRET is not set; cannot authenticate to backend"
+            "QABOT_API_TOKEN is not set; create one via POST /api/api-tokens "
+            "with scopes [tasks:create, tasks:read, bugs:read]"
         )
-    return {"X-Internal-Secret": secret, "Content-Type": "application/json"}
+    return {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
 
 
 def submit_task(
     *,
     url: str,
     project_id: str | None = None,
-    mode: str = "exploratory",
     viewport: dict[str, int] | None = None,
     api_url: str = DEFAULT_API_URL,
 ) -> str:
-    """POST /tasks — returns task_id."""
+    """POST /api/v1/tasks — returns task_id."""
     payload: dict[str, Any] = {
         "url": url,
-        "mode": mode,
-        "viewport": viewport or {"width": 1440, "height": 900},
+        "browsers": ["chromium"],
+        "viewports": [viewport or {"width": 1440, "height": 900}],
     }
     if project_id:
         payload["project_id"] = project_id
     with httpx.Client(timeout=30.0) as client:
         resp = client.post(
-            f"{api_url}/tasks",
+            f"{api_url}/v1/tasks",
             json=payload,
             headers=_auth_headers(),
         )
@@ -71,14 +73,39 @@ def submit_task(
 
 
 def get_task(task_id: str, *, api_url: str = DEFAULT_API_URL) -> dict[str, Any]:
+    """GET /api/v1/tasks/{id} — returns envelope ``{"task": {...}, "critical_count": int, ...}``."""
     with httpx.Client(timeout=30.0) as client:
         resp = client.get(
-            f"{api_url}/tasks/{task_id}",
+            f"{api_url}/v1/tasks/{task_id}",
             headers=_auth_headers(),
         )
     if resp.status_code >= 400:
         raise QabotError(f"get_task failed: {resp.status_code} {resp.text[:400]}")
     return resp.json()
+
+
+def get_task_bugs(task_id: str, *, api_url: str = DEFAULT_API_URL) -> list[dict[str, Any]]:
+    """GET /api/v1/tasks/{id}/bugs — full bug list with provenance, severity, etc.
+
+    Backend exposes this under the v1 API-token surface (commit 2b1d01d).
+    The legacy /api/tasks/{id}/bugs sits behind session cookies and 401s
+    on Bearer.
+    """
+    with httpx.Client(timeout=30.0) as client:
+        resp = client.get(
+            f"{api_url}/v1/tasks/{task_id}/bugs",
+            headers=_auth_headers(),
+        )
+    if resp.status_code >= 400:
+        raise QabotError(
+            f"get_task_bugs failed: {resp.status_code} {resp.text[:400]}"
+        )
+    data = resp.json()
+    if isinstance(data, dict):
+        return data.get("bugs") or data.get("data") or []
+    if isinstance(data, list):
+        return data
+    return []
 
 
 def wait_for_completion(
@@ -94,15 +121,20 @@ def wait_for_completion(
     last_logged_status: str | None = None
 
     while time.monotonic() < deadline:
-        data = get_task(task_id, api_url=api_url)
-        status = (data.get("status") or "").lower()
+        envelope = get_task(task_id, api_url=api_url)
+        task = envelope.get("task") if isinstance(envelope, dict) else None
+        if not task:
+            task = envelope  # /api/v1/tasks/:id POST returns flat; GET wraps in {"task":{}}
+        status = (task.get("status") or "").lower()
         if status != last_logged_status:
             if progress_callback:
-                progress_callback(status, data)
+                progress_callback(status, task)
             last_logged_status = status
         if status in {"done", "completed", "failed", "error"}:
-            bugs = data.get("bugs") or []
-            return TaskResult(task_id=task_id, status=status, bugs=bugs, raw=data)
+            bugs = get_task_bugs(task_id, api_url=api_url)
+            return TaskResult(
+                task_id=task_id, status=status, bugs=bugs, raw=envelope
+            )
         time.sleep(poll_interval)
 
     raise QabotError(f"task {task_id} did not complete within {timeout}s")
