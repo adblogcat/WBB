@@ -45,7 +45,21 @@ DETECTOR_SOURCES = frozenset({
 
 def _is_detector(reported: dict[str, Any]) -> bool:
     src = str(reported.get("source", "") or "").lower()
-    return src in DETECTOR_SOURCES
+    if src in DETECTOR_SOURCES:
+        return True
+    # iter#12: agent's own hallucination-self-detection (added in qabot
+    # commit 7b315bc) lands with source='agent_scenario' but
+    # provenance.hallucinated=true. Semantically these are diagnostic
+    # signals about the agent's own behaviour, not site defects — same
+    # category as detector findings. Treat them as detector so they
+    # don't drag precision down through self-blame.
+    prov = reported.get("provenance") or {}
+    if isinstance(prov, dict) and prov.get("hallucinated") is True:
+        return True
+    title = str(reported.get("title", "") or "").lower()
+    if title.startswith("[agent] claimed action"):
+        return True
+    return False
 
 
 # Iter#8 fuzzy dedup helpers. Short stopwords (RU + EN) that flood
