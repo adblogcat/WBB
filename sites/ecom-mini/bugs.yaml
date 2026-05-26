@@ -1,0 +1,124 @@
+# Ground truth for ecom-mini.test.vibecrew.space
+# Each entry is an intentionally planted defect. The evaluator scores
+# agent runs by matching reported bugs to these entries via match_predicate.
+
+- id: ECOM-001
+  category: function
+  severity: high
+  trigger: "Введите 'pho' в поиск (поле сверху каталога), посмотрите результат."
+  expected: "Должен показать iPhone, Pixel Phone и любые товары, в названии которых есть 'pho'."
+  actual: "Показывает '0 товаров найдено', хотя в каталоге есть товары с 'phone' в названии."
+  match_predicate:
+    keywords_any:
+      - "поиск"
+      - "search"
+      - "pho"
+      - "phone"
+      - "не найдены"
+      - "no results"
+      - "пусто"
+      - "substring"
+      - "подстрок"
+      - "точн"     # "точное совпадение"
+    page_url_regex: "(/$|/search|/\\?q=)"
+
+- id: ECOM-002
+  category: data
+  severity: high
+  trigger: "Добавьте товар в корзину, на странице корзины измените количество на 12 (или больше)."
+  expected: "Итоговая сумма = цена × 12."
+  actual: "Поле количества хранит только одну цифру, итог пересчитывается как цена × 2 (или последний введённый знак)."
+  match_predicate:
+    keywords_any:
+      - "количеств"
+      - "qty"
+      - "quantity"
+      - "сумм"
+      - "итог"
+      - "total"
+      - "пересч"
+      - "обрез"
+      - "одна цифра"
+      - "single digit"
+      - "12"
+    page_url_regex: "/cart"
+
+- id: ECOM-003
+  category: function
+  severity: critical
+  trigger: "Добавьте 2 товара в корзину, на странице корзины нажмите 'Удалить' у одного из них."
+  expected: "Товар исчезает из списка, итоговая сумма пересчитывается."
+  actual: "Появляется toast 'Удалено', но товар остаётся в корзине, итог не меняется."
+  match_predicate:
+    keywords_any:
+      - "удал"
+      - "remove"
+      - "delete"
+      - "корзин"
+      - "cart"
+      - "не удаляется"
+      - "остаётся"
+      - "stays"
+      - "no effect"
+      - "не пропадает"
+    page_url_regex: "/cart"
+
+- id: ECOM-004
+  category: usability
+  severity: medium
+  trigger: "Откройте страницу корзины при пустой корзине."
+  expected: "Кнопка 'Оформить заказ' должна быть disabled или скрыта."
+  actual: "Кнопка 'Оформить заказ' активна, по клику ведёт на /checkout с пустым заказом."
+  match_predicate:
+    keywords_any:
+      - "оформить"
+      - "checkout"
+      - "пуст"
+      - "empty"
+      - "disabled"
+      - "active"
+      - "активн"
+      - "разблок"
+    page_url_regex: "(/cart|/checkout)"
+
+- id: ECOM-005
+  category: visual
+  severity: low
+  trigger: "Откройте главную страницу с каталогом."
+  expected: "Бейдж 'Sale' должен показываться только на товарах со скидкой (поле discount > 0)."
+  actual: "Бейдж 'Sale' отображается на ВСЕХ карточках товаров, включая товары без скидки."
+  match_predicate:
+    keywords_any:
+      - "sale"
+      - "скидк"
+      - "бейдж"
+      - "badge"
+      - "лейбл"
+      - "всех"
+      - "все товары"
+      - "every product"
+      - "all products"
+    page_url_regex: "(/$|/catalog)"
+
+- id: ECOM-006
+  category: edge
+  severity: medium
+  trigger: "В поле количества в корзине введите '0' и нажмите Enter."
+  expected: "Поле должно отвергнуть 0 (минимум 1) или предложить удалить товар."
+  actual: "Поле принимает 0, итоговая сумма становится 0₽, но товар остаётся в списке заказа."
+  match_predicate:
+    keywords_any:
+      - "0"
+      - "ноль"
+      - "zero"
+      - "minimum"
+      - "минимум"
+      - "пуст"
+      - "validation"
+      - "валидац"
+    page_url_regex: "/cart"
+
+# Deliberate non-bugs (false-positive bait):
+# - На главной hero намеренно минималистичный — это дизайн-выбор, не "missing content".
+# - У товаров нет рейтингов/отзывов — спецификация сайта, не bug.
+# - Цена показывается без копеек (только целое) — намеренно.
