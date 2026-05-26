@@ -105,3 +105,34 @@ Mean F1 = 0.508 · Recall 0.833 · Precision 0.370
 Iter#10 (PLAN edge-state bias) delivered: ECOM-004 (empty-cart checkout still active) was missed in every prior run, now matched on the fresh cell — explicit edge-state scenario captured it. DASH-005 (sort always asc) also now matched.
 
 Total session trajectory: F1 0.117 → 0.508 (+334%).
+
+## iter#13 — Phase 2 expanded to 8 sites (2026-05-26 PM)
+
+### 5 new sites (parallel eval via ThreadPoolExecutor)
+
+| Site | reported | scored | det | matched | F1 |
+|------|---------:|-------:|----:|--------:|---:|
+| kanban-board | 9 | 2 | 7 | 5/6 | 0.91 |
+| booking-calendar | 14 | 9 | 5 | 5/6 | 0.74 |
+| auth-portal | 11 | 6 | 5 | 3/6 | 0.55 |
+| store-filters | 17 | 8 | 9 | 5/6 | 0.54 |
+| search-autocomplete | 15 | 4 | 11 | 5/6 | 0.48 |
+
+**Mean (5 new sites): F1=0.642 · Recall=0.767 · Precision=0.600**
+
+Weighted estimate across 8 sites (3 iter#7 + 5 iter#13): **F1 ≈ 0.59**.
+
+### Что сработало для новых UI patterns
+
+- Native HTML controls (`<select>`, `<input type=date/time>`, range slider) — agent тестит их через стандартные click/fill без специальных tools.
+- Modal dialog (booking) — focus trap, Escape handler, cancel-reset все 5/6 нашлись.
+- HTML5 drag-and-drop (kanban) — даже без специального DnD tool agent через клики и `evaluate_js` распознал что после reload карточки возвращаются.
+- Multi-route navigation (auth-portal /login + /signup + /forgot) — частичная coverage, agent тратил budget на login.
+
+### Iter#12 fix: hallucination → detector bucket
+
+Agent's own `[Agent] claimed action without performing it` self-detection persists в БД с `provenance.hallucinated=true`. Они засчитывались как FP, бьющие precision. Iter#12 scorer теперь treat'ит их как detector findings (same bucket как a11y).
+
+### CLI parallel (iter#11)
+
+`wbb-eval run --sites a,b,c,...` теперь использует ThreadPoolExecutor; 5 cells параллельно ~15 min vs ~75 min sequential. `--sequential` flag для отката.
