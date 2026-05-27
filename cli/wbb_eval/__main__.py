@@ -50,6 +50,26 @@ def _site_url(slug: str) -> str:
     return f"https://{slug}.{DEFAULT_DOMAIN_BASE}"
 
 
+def _site_goal(slug: str) -> str | None:
+    """Read acceptance criteria / goal from sites/<slug>/site.yaml.
+
+    Critical for predict-verify agents: without AC the predictor falls
+    back to "find general defects" and cannot anchor expectations to the
+    product's actual requirements.
+    """
+    cfg = SITES_DIR / slug / "site.yaml"
+    if not cfg.exists():
+        return None
+    try:
+        data = yaml.safe_load(cfg.read_text()) or {}
+    except yaml.YAMLError:
+        return None
+    goal = data.get("goal")
+    if isinstance(goal, str) and goal.strip():
+        return goal.strip()
+    return None
+
+
 def _on_progress(status: str, _data) -> None:
     ts = time.strftime("%H:%M:%S")
     print(f"[{ts}] status={status}", flush=True)
@@ -59,8 +79,10 @@ def run_one(slug: str, *, api_url: str = DEFAULT_API_URL) -> dict:
     site_dir = SITES_DIR / slug
     gt = load_ground_truth(site_dir)
     url = _site_url(slug)
-    print(f"[run] site={slug} url={url} gt_bugs={len(gt)}", flush=True)
-    task_id = submit_task(url=url, api_url=api_url)
+    goal = _site_goal(slug)
+    goal_marker = f"goal_chars={len(goal)}" if goal else "goal=NONE"
+    print(f"[run] site={slug} url={url} gt_bugs={len(gt)} {goal_marker}", flush=True)
+    task_id = submit_task(url=url, goal=goal, api_url=api_url)
     print(f"[run] task_id={task_id}", flush=True)
     result = wait_for_completion(
         task_id, api_url=api_url, progress_callback=_on_progress

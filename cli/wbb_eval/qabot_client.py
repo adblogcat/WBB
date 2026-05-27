@@ -45,6 +45,7 @@ def _auth_headers() -> dict[str, str]:
 def submit_task(
     *,
     url: str,
+    goal: str | None = None,
     project_id: str | None = None,
     viewport: dict[str, int] | None = None,
     api_url: str = DEFAULT_API_URL,
@@ -63,6 +64,8 @@ def submit_task(
         "browsers": ["chromium"],
         "viewports": [viewport or {"width": 1440, "height": 900}],
     }
+    if goal:
+        payload["goal"] = goal
     if project_id:
         payload["project_id"] = project_id
 
